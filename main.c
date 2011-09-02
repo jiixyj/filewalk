@@ -46,8 +46,7 @@ static struct filename_representations
     struct filename_representations *fr =
                              g_malloc(sizeof(struct filename_representations));
 
-    int is_invalid = 0, is_escaped = 0;
-    char *display_pre, *escaped, *new_display = NULL;
+    char *display_pre;
 
     fr->type = type;
     fr->raw = g_strdup(raw);
@@ -55,27 +54,8 @@ static struct filename_representations
     display_pre = g_filename_display_name(fr->raw);
     fr->collate_key = g_utf8_collate_key_for_filename(display_pre, -1);
 
-    if (strstr(display_pre, "\357\277\275")) is_invalid = 1;
-
-    escaped = g_strescape(display_pre, (const gchar *) strescape_exceptions);
-    if (strcmp(display_pre, escaped)) is_escaped = 1;
+    fr->display = g_strescape(display_pre, (const gchar *) strescape_exceptions);
     g_free(display_pre);
-
-    if (is_invalid && is_escaped) {
-        new_display = g_strconcat(escaped,
-                                  " (invalid encoding, escaped)", NULL);
-    } else if (is_invalid) {
-        new_display = g_strconcat(escaped, " (invalid encoding)", NULL);
-    } else if (is_escaped) {
-        new_display = g_strconcat(escaped, " (escaped)", NULL);
-    }
-
-    if (new_display) {
-        g_free(escaped);
-        fr->display = new_display;
-    } else {
-        fr->display = escaped;
-    }
     return fr;
 }
 
