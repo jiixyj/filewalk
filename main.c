@@ -32,8 +32,12 @@ static int compare_filenames(gconstpointer lhs,
                              gconstpointer rhs,
                              gpointer user_data) {
     (void) user_data;
-    return strcmp(((struct filename_representations const*) lhs)->collate_key,
-                  ((struct filename_representations const*) rhs)->collate_key);
+    struct filename_representations const *fr_l = lhs;
+    struct filename_representations const *fr_r = rhs;
+    if (fr_l->type != fr_r->type) {
+        return fr_l->type - fr_r->type;
+    }
+    return strcmp(fr_l->collate_key, fr_r->collate_key);
 }
 
 static struct filename_representations
