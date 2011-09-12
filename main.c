@@ -21,7 +21,11 @@ static void free_error(gpointer user, gpointer user_data)
 
 static void get_file_size(gpointer user, gpointer user_data)
 {
+#ifdef GStatBuf
+    GStatBuf stat_buf;
+#else
     struct stat stat_buf;
+#endif
     struct filename_list_node *fln = (struct filename_list_node *) user;
     guint64 *file_size;
 
