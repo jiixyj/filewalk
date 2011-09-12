@@ -20,8 +20,14 @@ struct filename_representations {
     int _; /* padding */
 };
 
+struct filename_list_node {
+    struct filename_representations *fr;
+    void *d;
+};
+
 Filetree filetree_init(const char* root, GSList **errors);
 void filetree_print(Filetree tree);
 void filetree_destroy(Filetree tree);
+void filetree_file_list(Filetree tree, GSList **files);
 
 #endif /* end of include guard: FILETREE_H */

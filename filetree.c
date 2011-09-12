@@ -1,6 +1,7 @@
 #include "filetree.h"
 
 #include <stdio.h>
+#include <string.h>
 
 static const unsigned char strescape_exceptions[] = {
   0x7f,  0x80,  0x81,  0x82,  0x83,  0x84,  0x85,  0x86,
@@ -26,9 +27,9 @@ static const unsigned char strescape_exceptions[] = {
 static int compare_filenames(gconstpointer lhs,
                              gconstpointer rhs,
                              gpointer user_data) {
-    (void) user_data;
     struct filename_representations const *fr_l = lhs;
     struct filename_representations const *fr_r = rhs;
+    (void) user_data;
     if (fr_l->type != fr_r->type) {
         return fr_l->type - fr_r->type;
     }
@@ -73,17 +74,19 @@ static void walk_recursive(const char *current_dir_string,
     while ((basename = g_dir_read_name(current_dir))) {
         filename = g_build_filename(current_dir_string, basename, NULL);
         if (g_file_test(filename, G_FILE_TEST_IS_DIR)) {
+            struct filename_representations *fr = NULL;
             GError *err = NULL;
+            GTree *sub_dir_tree = NULL;
+
             GDir *sub_dir = g_dir_open(filename, 0, &err);
             if (err) {
                 *errors = g_slist_prepend(*errors, err);
                 goto next;
             }
-            struct filename_representations *fr =
-                        filename_representations_new(filename, FILETREE_DIR);
-            GTree *sub_dir_tree = g_tree_new_full(compare_filenames, NULL,
-                                                  filename_representations_free,
-                                                  filetree_destroy);
+            fr = filename_representations_new(filename, FILETREE_DIR);
+            sub_dir_tree = g_tree_new_full(compare_filenames, NULL,
+                                           filename_representations_free,
+                                           filetree_destroy);
             g_tree_insert(current_tree, fr, sub_dir_tree);
             walk_recursive(filename, sub_dir, sub_dir_tree, errors);
             g_dir_close(sub_dir);
@@ -103,6 +106,7 @@ Filetree filetree_init(const char* root, GSList **errors)
     GDir *dir;
     GTree *root_tree, *sub_dir_tree;
     GError *err = NULL;
+    struct filename_representations *fr = NULL;
 
     if (!g_file_test(root, G_FILE_TEST_IS_DIR)) {
         return NULL;
@@ -116,8 +120,7 @@ Filetree filetree_init(const char* root, GSList **errors)
     root_tree = g_tree_new_full(compare_filenames, NULL,
                                 filename_representations_free,
                                 filetree_destroy);
-    struct filename_representations *fr =
-                            filename_representations_new(root, FILETREE_DIR);
+    fr = filename_representations_new(root, FILETREE_DIR);
     sub_dir_tree = g_tree_new_full(compare_filenames, NULL,
                                    filename_representations_free,
                                    filetree_destroy);
@@ -146,6 +149,25 @@ static gboolean print_tree_entries(gpointer key,
     return FALSE;
 }
 
+static gboolean append_file_node(gpointer key,
+                                 gpointer value,
+                                 gpointer data)
+{
+    GSList **files = (GSList **) data;
+    if (value) {
+        g_tree_foreach((Filetree) value,
+                       append_file_node,
+                       files);
+    } else {
+        struct filename_list_node *new_file_node =
+                            g_malloc(sizeof(struct filename_list_node));
+        new_file_node->fr = (struct filename_representations*) key;
+        new_file_node->d = NULL;
+        *files = g_slist_prepend(*files, new_file_node);
+    }
+    return FALSE;
+}
+
 void filetree_print(Filetree tree)
 {
     g_tree_foreach(tree, print_tree_entries, GINT_TO_POINTER(0));
@@ -156,4 +178,10 @@ void filetree_destroy(Filetree tree)
     if (tree) {
         g_tree_destroy(tree);
     }
+}
+
+void filetree_file_list(Filetree tree, GSList **files)
+{
+    g_tree_foreach(tree, append_file_node, files);
+    *files = g_slist_reverse(*files);
 }
