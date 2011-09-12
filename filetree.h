@@ -1,6 +1,8 @@
 #ifndef FILETREE_H
 #define FILETREE_H
 
+#include <glib.h>
+
 typedef void *Filetree;
 
 #define FILETREE_DIR 1
@@ -18,7 +20,7 @@ struct filename_representations {
     int _; /* padding */
 };
 
-Filetree filetree_init(const char* root);
+Filetree filetree_init(const char* root, GSList **errors);
 void filetree_print(Filetree tree);
 void filetree_destroy(Filetree tree);
 
