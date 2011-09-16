@@ -7,6 +7,9 @@
 #include <sys/stat.h>
 #include <glib/gstdio.h>
 
+#include "input.h"
+
+
 static void print_error(gpointer user, gpointer user_data)
 {
     (void) user_data;
@@ -37,6 +40,48 @@ static void get_file_size(gpointer user, gpointer user_data)
     } else {
         *file_size = (guint64) stat_buf.st_size;
     }
+}
+
+static void get_number_of_frames(gpointer user, gpointer user_data)
+{
+    struct filename_list_node *fln = (struct filename_list_node *) user;
+    size_t *number_of_frames;
+
+    struct input_ops* ops = NULL;
+    struct input_handle* ih = NULL;
+    FILE *file = NULL;
+    int result;
+
+
+    (void) user_data;
+    fln->d = g_malloc(sizeof(size_t));
+    number_of_frames = (size_t *) fln->d;
+    *number_of_frames = 0;
+
+
+    ops = input_get_ops(fln->fr->raw);
+    if (!ops) {
+        fprintf(stderr, "no ops");
+        goto free;
+    }
+    ih = ops->handle_init();
+
+    file = g_fopen(fln->fr->raw, "rb");
+    if (!file) {
+        fprintf(stderr, "Error opening file '%s'\n", fln->fr->display);
+        goto free;
+    }
+    result = ops->open_file(ih, file, fln->fr->raw);
+    if (result) {
+        fprintf(stderr, "result fail");
+        goto free;
+    }
+
+    *number_of_frames = ops->get_total_frames(ih);
+
+  free:
+    if (file) ops->close_file(ih, file);
+    if (ih) ops->handle_destroy(&ih);
 }
 
 static void print_file_size(gpointer user, gpointer user_data)
@@ -86,6 +131,7 @@ static void parse_args(int *argc, char **argv[])
 #if GLIB_CHECK_VERSION(2, 14, 0)
         gchar* help = g_option_context_get_help(context, FALSE, NULL);
         fprintf(stderr, "%s", help);
+        g_free(help);
 #else
         fprintf(stderr, "Get help with -h or --help.\n");
 #endif
@@ -102,6 +148,9 @@ int main(int argc, char *argv[])
     Filetree tree;
 
     parse_args(&argc, &argv);
+    g_thread_init(NULL);
+    input_init(argv[0], NULL);
+
 
     setlocale(LC_COLLATE, "");
     setlocale(LC_CTYPE, "");
@@ -114,14 +163,14 @@ int main(int argc, char *argv[])
     g_slist_free(errors);
 
     filetree_file_list(tree, &files);
-    g_slist_foreach(files, get_file_size, NULL);
+    g_slist_foreach(files, get_number_of_frames, NULL);
     g_slist_foreach(files, print_file_size, NULL);
     g_slist_foreach(files, free_list_entry, NULL);
     g_slist_free(files);
 
     filetree_destroy(tree);
-
     g_strfreev(file_names);
+    input_deinit();
 
     return EXIT_SUCCESS;
 }
