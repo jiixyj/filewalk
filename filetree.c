@@ -39,18 +39,18 @@ static int compare_filenames(gconstpointer lhs,
 static struct filename_representations
 *filename_representations_new(const char *raw, int type)
 {
-    struct filename_representations *fr =
-                             g_malloc(sizeof(struct filename_representations));
-
+    struct filename_representations *fr;
     char *display_pre;
 
+    fr = g_malloc(sizeof(struct filename_representations));
     fr->type = type;
     fr->raw = g_strdup(raw);
 
     display_pre = g_filename_display_name(fr->raw);
     fr->collate_key = g_utf8_collate_key_for_filename(display_pre, -1);
 
-    fr->display = g_strescape(display_pre, (const gchar *) strescape_exceptions);
+    fr->display = g_strescape(display_pre,
+                              (const gchar *) strescape_exceptions);
     g_free(display_pre);
     return fr;
 }
@@ -66,6 +66,7 @@ static void filename_representations_free(void *fr)
 static void walk_recursive(const char *current_dir_string,
                            GDir *current_dir,
                            GTree *current_tree,
+                           gboolean follow_symlinks,
                            GSList **errors)
 {
     const gchar *basename;
@@ -78,6 +79,11 @@ static void walk_recursive(const char *current_dir_string,
             GError *err = NULL;
             GTree *sub_dir_tree = NULL;
 
+            if (!follow_symlinks
+                && g_file_test(filename, G_FILE_TEST_IS_SYMLINK)) {
+                goto next;
+            }
+
             GDir *sub_dir = g_dir_open(filename, 0, &err);
             if (err) {
                 *errors = g_slist_prepend(*errors, err);
@@ -88,11 +94,12 @@ static void walk_recursive(const char *current_dir_string,
                                            filename_representations_free,
                                            filetree_destroy);
             g_tree_insert(current_tree, fr, sub_dir_tree);
-            walk_recursive(filename, sub_dir, sub_dir_tree, errors);
+            walk_recursive(filename, sub_dir, sub_dir_tree,
+                           follow_symlinks, errors);
             g_dir_close(sub_dir);
         } else if (g_file_test(filename, G_FILE_TEST_IS_REGULAR)) {
-            struct filename_representations *fr =
-                        filename_representations_new(filename, FILETREE_FILE);
+            struct filename_representations *fr;
+            fr = filename_representations_new(filename, FILETREE_FILE);
             g_tree_insert(current_tree, fr, NULL);
         }
       next:
@@ -101,33 +108,50 @@ static void walk_recursive(const char *current_dir_string,
 }
 
 /* root: directory in glib file name encoding */
-Filetree filetree_init(const char* root, GSList **errors)
+Filetree filetree_init(char *roots[],
+                       size_t roots_size,
+                       gboolean recursive,
+                       gboolean follow_symlinks,
+                       GSList **errors)
 {
-    GDir *dir;
-    GTree *root_tree, *sub_dir_tree;
-    GError *err = NULL;
-    struct filename_representations *fr = NULL;
+    GTree *root_tree = g_tree_new_full(compare_filenames, NULL,
+                                       filename_representations_free,
+                                       filetree_destroy);
+    size_t i;
 
-    if (!g_file_test(root, G_FILE_TEST_IS_DIR)) {
-        return NULL;
+    for (i = 0; i < roots_size; ++i) {
+        GTree *sub_dir_tree;
+        GDir *dir;
+        GError *err;
+        struct filename_representations *fr;
+
+        if (!follow_symlinks
+            && g_file_test(roots[i], G_FILE_TEST_IS_SYMLINK)) {
+            continue;
+        }
+
+        if (recursive && g_file_test(roots[i], G_FILE_TEST_IS_DIR)) {
+            err = NULL;
+            dir = g_dir_open(roots[i], 0, &err);
+            if (err) {
+                *errors = g_slist_prepend(*errors, err);
+                err = NULL;
+                continue;
+            }
+            fr = filename_representations_new(roots[i], FILETREE_DIR);
+            sub_dir_tree = g_tree_new_full(compare_filenames, NULL,
+                                           filename_representations_free,
+                                           filetree_destroy);
+
+            g_tree_insert(root_tree, fr, sub_dir_tree);
+            walk_recursive(roots[i], dir, sub_dir_tree,
+                           follow_symlinks, errors);
+            g_dir_close(dir);
+        } else if (g_file_test(roots[i], G_FILE_TEST_IS_REGULAR)) {
+            fr = filename_representations_new(roots[i], FILETREE_FILE);
+            g_tree_insert(root_tree, fr, NULL);
+        }
     }
-    dir = g_dir_open(root, 0, &err);
-    if (err) {
-        *errors = g_slist_prepend(*errors, err);
-        return NULL;
-    }
-
-    root_tree = g_tree_new_full(compare_filenames, NULL,
-                                filename_representations_free,
-                                filetree_destroy);
-    fr = filename_representations_new(root, FILETREE_DIR);
-    sub_dir_tree = g_tree_new_full(compare_filenames, NULL,
-                                   filename_representations_free,
-                                   filetree_destroy);
-
-    g_tree_insert(root_tree, fr, sub_dir_tree);
-    walk_recursive(root, dir, sub_dir_tree, errors);
-    g_dir_close(dir);
 
     return root_tree;
 }
@@ -159,8 +183,8 @@ static gboolean append_file_node(gpointer key,
                        append_file_node,
                        files);
     } else {
-        struct filename_list_node *new_file_node =
-                            g_malloc(sizeof(struct filename_list_node));
+        struct filename_list_node *new_file_node;
+        new_file_node = g_malloc(sizeof(struct filename_list_node));
         new_file_node->fr = (struct filename_representations*) key;
         new_file_node->d = NULL;
         *files = g_slist_prepend(*files, new_file_node);

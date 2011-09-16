@@ -58,18 +58,55 @@ static void free_list_entry(gpointer user, gpointer user_data)
     g_free(user);
 }
 
+static gboolean recursive = FALSE;
+static gboolean follow_symlinks = FALSE;
+static gchar **file_names;
+
+static GOptionEntry entries[] =
+{
+    { "recursive", 'r', 0, G_OPTION_ARG_NONE, &recursive,
+      "recurse into directories", NULL },
+    { "follow-symlinks", 'L', 0, G_OPTION_ARG_NONE, &follow_symlinks,
+      "follow symbolic links", NULL },
+    { G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_FILENAME_ARRAY, &file_names,
+      "<input>" , "[FILE|DIRECTORY]..."},
+    { NULL, 0, 0, G_OPTION_ARG_NONE, NULL, NULL, 0 }
+};
+
+static void parse_args(int *argc, char **argv[])
+{
+    GError *error = NULL;
+    GOptionContext *context = g_option_context_new("- walk file hierarchy");
+    g_option_context_add_main_entries(context, entries, NULL);
+    if (!g_option_context_parse(context, argc, argv, &error)) {
+        g_print("option parsing failed: %s\n", error->message);
+        exit(EXIT_FAILURE);
+    }
+    if (!file_names) {
+#if GLIB_CHECK_VERSION(2, 14, 0)
+        gchar* help = g_option_context_get_help(context, FALSE, NULL);
+        fprintf(stderr, "%s", help);
+#else
+        fprintf(stderr, "Get help with -h or --help.\n");
+#endif
+        g_option_context_free(context);
+        exit(EXIT_FAILURE);
+    }
+    g_option_context_free(context);
+}
+
+
 int main(int argc, char *argv[])
 {
     GSList *errors = NULL, *files = NULL;
     Filetree tree;
 
-    if (argc != 2) {
-        fprintf(stderr, "Invalid number of arguments\n");
-        return EXIT_FAILURE;
-    }
+    parse_args(&argc, &argv);
+
     setlocale(LC_COLLATE, "");
     setlocale(LC_CTYPE, "");
-    tree = filetree_init(argv[1], &errors);
+    tree = filetree_init(file_names, g_strv_length(file_names),
+                         recursive, follow_symlinks, &errors);
     /* filetree_print(tree); */
 
     g_slist_foreach(errors, print_error, NULL);
@@ -83,6 +120,8 @@ int main(int argc, char *argv[])
     g_slist_free(files);
 
     filetree_destroy(tree);
+
+    g_strfreev(file_names);
 
     return EXIT_SUCCESS;
 }

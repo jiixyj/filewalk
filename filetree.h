@@ -25,7 +25,11 @@ struct filename_list_node {
     void *d;
 };
 
-Filetree filetree_init(const char* root, GSList **errors);
+Filetree filetree_init(char *roots[],
+                       size_t roots_size,
+                       gboolean recursive,
+                       gboolean follow_symlinks,
+                       GSList **errors);
 void filetree_print(Filetree tree);
 void filetree_destroy(Filetree tree);
 void filetree_file_list(Filetree tree, GSList **files);
