@@ -2,6 +2,10 @@
 
 #include <stdio.h>
 #include <string.h>
+#ifdef G_OS_WIN32
+#include <io.h>
+#include <fcntl.h>
+#endif
 
 static const unsigned char strescape_exceptions[] = {
   0x7f,  0x80,  0x81,  0x82,  0x83,  0x84,  0x85,  0x86,
@@ -78,13 +82,14 @@ static void walk_recursive(const char *current_dir_string,
             struct filename_representations *fr = NULL;
             GError *err = NULL;
             GTree *sub_dir_tree = NULL;
+            GDir *sub_dir;
 
             if (!follow_symlinks
                 && g_file_test(filename, G_FILE_TEST_IS_SYMLINK)) {
                 goto next;
             }
 
-            GDir *sub_dir = g_dir_open(filename, 0, &err);
+            sub_dir = g_dir_open(filename, 0, &err);
             if (err) {
                 *errors = g_slist_prepend(*errors, err);
                 goto next;
@@ -164,7 +169,8 @@ static gboolean print_tree_entries(gpointer key,
     for (i = 0; i < GPOINTER_TO_INT(data); ++i) {
         putchar(' ');
     }
-    g_print("%s\n", ((struct filename_representations*) key)->display);
+    print_utf8_string(((struct filename_representations*) key)->display);
+    putchar('\n');
     if (value) {
         g_tree_foreach((Filetree) value,
                        print_tree_entries,
@@ -208,4 +214,22 @@ void filetree_file_list(Filetree tree, GSList **files)
 {
     g_tree_foreach(tree, append_file_node, files);
     *files = g_slist_reverse(*files);
+}
+
+void print_utf8_string(const char *string)
+{
+#ifdef G_OS_WIN32
+    int translation_mode;
+    gunichar2 *utf16;
+
+    fflush(stdout);
+    translation_mode = _setmode(_fileno(stdout), _O_U8TEXT);
+    utf16 = g_utf8_to_utf16(string, -1, NULL, NULL, NULL);
+    wprintf(L"%s", utf16);
+    g_free(utf16);
+    fflush(stdout);
+    _setmode(_fileno(stdout), translation_mode);
+#else
+    g_print("%s", string);
+#endif
 }

@@ -34,4 +34,6 @@ void filetree_print(Filetree tree);
 void filetree_destroy(Filetree tree);
 void filetree_file_list(Filetree tree, GSList **files);
 
+void print_utf8_string(const char *string);
+
 #endif /* end of include guard: FILETREE_H */

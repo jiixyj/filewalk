@@ -90,10 +90,8 @@ static void print_file_size(gpointer user, gpointer user_data)
     guint64 *file_size = (guint64 *) fln->d;
 
     (void) user_data;
-    g_print("%s, %" G_GUINT64_FORMAT "\n",
-            fln->fr->display,
-            *file_size);
-    /* g_print("%s\n", fln->fr->display); */
+    print_utf8_string(fln->fr->display);
+    g_print(", %" G_GUINT64_FORMAT "\n", *file_size);
 }
 
 static void free_list_entry(gpointer user, gpointer user_data)
