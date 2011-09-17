@@ -29,10 +29,18 @@ Filetree filetree_init(char *roots[],
                        size_t roots_size,
                        gboolean recursive,
                        gboolean follow_symlinks,
+                       gboolean no_sort,
                        GSList **errors);
 void filetree_print(Filetree tree);
 void filetree_destroy(Filetree tree);
 void filetree_file_list(Filetree tree, GSList **files);
+
+/* traversal functions */
+void filetree_print_error(gpointer user, gpointer user_data);
+void filetree_free_error(gpointer user, gpointer user_data);
+void filetree_get_file_size(gpointer user, gpointer user_data);
+void filetree_print_file_size(gpointer user, gpointer user_data);
+void filetree_free_list_entry(gpointer user, gpointer user_data);
 
 void print_utf8_string(const char *string);
 

@@ -16,4 +16,4 @@ add_library(filetree filetree.c)
 target_link_libraries(filetree ${GLIB_LIBRARIES})
 
 add_executable(walk main.c)
-target_link_libraries(walk filetree input)
+target_link_libraries(walk filetree parse_global_args)

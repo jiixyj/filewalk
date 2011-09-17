@@ -6,6 +6,10 @@
 #include <io.h>
 #include <fcntl.h>
 #endif
+#include <sys/stat.h>
+
+#include <glib.h>
+#include <glib/gstdio.h>
 
 static const unsigned char strescape_exceptions[] = {
   0x7f,  0x80,  0x81,  0x82,  0x83,  0x84,  0x85,  0x86,
@@ -38,6 +42,15 @@ static int compare_filenames(gconstpointer lhs,
         return fr_l->type - fr_r->type;
     }
     return strcmp(fr_l->collate_key, fr_r->collate_key);
+}
+
+static int compare_insert_last(gconstpointer lhs,
+                               gconstpointer rhs,
+                               gpointer user_data) {
+    (void) lhs;
+    (void) rhs;
+    (void) user_data;
+    return 1;
 }
 
 static struct filename_representations
@@ -117,9 +130,12 @@ Filetree filetree_init(char *roots[],
                        size_t roots_size,
                        gboolean recursive,
                        gboolean follow_symlinks,
+                       gboolean no_sort,
                        GSList **errors)
 {
-    GTree *root_tree = g_tree_new_full(compare_filenames, NULL,
+    GTree *root_tree = g_tree_new_full(no_sort ? compare_insert_last
+                                               : compare_filenames,
+                                       NULL,
                                        filename_representations_free,
                                        filetree_destroy);
     size_t i;
@@ -160,6 +176,56 @@ Filetree filetree_init(char *roots[],
 
     return root_tree;
 }
+
+void filetree_print_error(gpointer user, gpointer user_data)
+{
+    (void) user_data;
+    g_warning("%s\n", ((GError *) user)->message);
+}
+
+void filetree_free_error(gpointer user, gpointer user_data)
+{
+    (void) user_data;
+    g_error_free((GError *) user);
+}
+
+void filetree_get_file_size(gpointer user, gpointer user_data)
+{
+#if GLIB_CHECK_VERSION(2, 25, 0)
+    GStatBuf stat_buf;
+#else
+    struct stat stat_buf;
+#endif
+    struct filename_list_node *fln = (struct filename_list_node *) user;
+    guint64 *file_size;
+
+    (void) user_data;
+    fln->d = g_malloc(sizeof(guint64));
+    file_size = (guint64 *) fln->d;
+    if (g_stat(fln->fr->raw, &stat_buf)) {
+        *file_size = 0;
+    } else {
+        *file_size = (guint64) stat_buf.st_size;
+    }
+}
+
+void filetree_print_file_size(gpointer user, gpointer user_data)
+{
+    struct filename_list_node *fln = (struct filename_list_node *) user;
+    guint64 *file_size = (guint64 *) fln->d;
+
+    (void) user_data;
+    print_utf8_string(fln->fr->display);
+    g_print(", %" G_GUINT64_FORMAT "\n", *file_size);
+}
+
+void filetree_free_list_entry(gpointer user, gpointer user_data)
+{
+    (void) user_data;
+    g_free(((struct filename_list_node *) user)->d);
+    g_free(user);
+}
+
 
 static gboolean print_tree_entries(gpointer key,
                                    gpointer value,
