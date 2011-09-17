@@ -189,8 +189,9 @@ Filetree filetree_init(char *roots[],
 
 void filetree_print_error(gpointer user, gpointer user_data)
 {
+    GError *err = (GError *) user;
     (void) user_data;
-    g_warning("%s\n", ((GError *) user)->message);
+    g_message("%s", err->message);
 }
 
 void filetree_free_error(gpointer user, gpointer user_data)
