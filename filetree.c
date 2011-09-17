@@ -151,7 +151,12 @@ Filetree filetree_init(char *roots[],
             continue;
         }
 
-        if (recursive && g_file_test(roots[i], G_FILE_TEST_IS_DIR)) {
+        if (g_file_test(roots[i], G_FILE_TEST_IS_DIR)) {
+            if (!recursive) {
+                *errors = g_slist_prepend(*errors, g_error_new(1, 1,
+                            "Skipping '%s', is a directory", roots[i]));
+                continue;
+            }
             err = NULL;
             dir = g_dir_open(roots[i], 0, &err);
             if (err) {
@@ -176,6 +181,8 @@ Filetree filetree_init(char *roots[],
                         "File '%s' not found", roots[i]));
         }
     }
+
+    *errors = g_slist_reverse(*errors);
 
     return root_tree;
 }
