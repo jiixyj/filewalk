@@ -171,6 +171,9 @@ Filetree filetree_init(char *roots[],
         } else if (g_file_test(roots[i], G_FILE_TEST_IS_REGULAR)) {
             fr = filename_representations_new(roots[i], FILETREE_FILE);
             g_tree_insert(root_tree, fr, NULL);
+        } else {
+            *errors = g_slist_prepend(*errors, g_error_new(1, 1,
+                        "File '%s' not found", roots[i]));
         }
     }
 
