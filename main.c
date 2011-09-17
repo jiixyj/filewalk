@@ -27,7 +27,11 @@ static void free_error(gpointer user, gpointer user_data)
 
 static void get_file_size(gpointer user, gpointer user_data)
 {
+#if GLIB_CHECK_VERSION(2, 25, 0)
     GStatBuf stat_buf;
+#else
+    struct stat stat_buf;
+#endif
     struct filename_list_node *fln = (struct filename_list_node *) user;
     guint64 *file_size;
 
@@ -166,7 +170,7 @@ int main(int argc, char *argv[])
 
     setlocale(LC_COLLATE, "");
     setlocale(LC_CTYPE, "");
-    tree = filetree_init(&argv[1], argc - 1,
+    tree = filetree_init(&argv[1], (size_t) (argc - 1),
                          recursive, follow_symlinks, &errors);
     /* filetree_print(tree); */
 
@@ -181,7 +185,6 @@ int main(int argc, char *argv[])
     g_slist_free(files);
 
     filetree_destroy(tree);
-    g_strfreev(file_names);
     input_deinit();
 
     return EXIT_SUCCESS;
