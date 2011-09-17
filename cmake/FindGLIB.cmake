@@ -15,11 +15,8 @@ find_library(GMODULE_LIBRARY NAMES gmodule-2.0 gmodule-2.0-0
              HINTS ${PC_GMODULE_LIBDIR} ${PC_GMODULE_LIBRARY_DIRS})
 
 if(WIN32)
-  if(${CMAKE_SIZEOF_VOID_P} EQUAL 4)
-    find_library(INTL_LIBRARY intl)
-  elseif(${CMAKE_SIZEOF_VOID_P} EQUAL 8)
-    find_library(INTL_LIBRARY intl-8)
-  endif()
+  unset(INTL_LIBRARY CACHE)
+  find_library(INTL_LIBRARY NAMES intl intl-8)
 endif()
 
 set(GLIB_LIBRARIES ${GLIB_LIBRARY} ${GTHREAD_LIBRARY} ${GMODULE_LIBRARY} ${INTL_LIBRARY})

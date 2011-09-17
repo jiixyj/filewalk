@@ -1,5 +1,8 @@
 #include "filetree.h"
 
+#ifdef G_OS_WIN32
+#include <windows.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <locale.h>
@@ -24,11 +27,7 @@ static void free_error(gpointer user, gpointer user_data)
 
 static void get_file_size(gpointer user, gpointer user_data)
 {
-#ifdef GStatBuf
     GStatBuf stat_buf;
-#else
-    struct stat stat_buf;
-#endif
     struct filename_list_node *fln = (struct filename_list_node *) user;
     guint64 *file_size;
 
@@ -103,7 +102,6 @@ static void free_list_entry(gpointer user, gpointer user_data)
 
 static gboolean recursive = FALSE;
 static gboolean follow_symlinks = FALSE;
-static gchar **file_names;
 
 static GOptionEntry entries[] =
 {
@@ -111,21 +109,37 @@ static GOptionEntry entries[] =
       "recurse into directories", NULL },
     { "follow-symlinks", 'L', 0, G_OPTION_ARG_NONE, &follow_symlinks,
       "follow symbolic links", NULL },
-    { G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_FILENAME_ARRAY, &file_names,
-      "<input>" , "[FILE|DIRECTORY]..."},
     { NULL, 0, 0, G_OPTION_ARG_NONE, NULL, NULL, 0 }
 };
 
-static void parse_args(int *argc, char **argv[])
+#ifdef G_OS_WIN32
+extern int __wgetmainargs(int *_Argc, wchar_t ***_Argv, wchar_t ***_Env,
+                          int _DoWildCard, STARTUPINFO *_StartInfo);
+#endif
+
+static void parse_args(int *argc, char ***argv)
 {
     GError *error = NULL;
     GOptionContext *context = g_option_context_new("- walk file hierarchy");
+#ifdef G_OS_WIN32
+    wchar_t **wargv, **wenv;
+    STARTUPINFO si = {0};
+    int i;
+
+    __wgetmainargs(argc, &wargv, &wenv, TRUE, &si);
+    *argv = g_new(gchar *, *argc + 1);
+    for (i = 0; i < *argc; ++i) {
+        (*argv)[i] = g_utf16_to_utf8(wargv[i], -1, NULL, NULL, NULL);
+    }
+    (*argv)[i] = NULL;
+#endif
+
     g_option_context_add_main_entries(context, entries, NULL);
     if (!g_option_context_parse(context, argc, argv, &error)) {
         g_print("option parsing failed: %s\n", error->message);
         exit(EXIT_FAILURE);
     }
-    if (!file_names) {
+    if (*argc == 1) {
 #if GLIB_CHECK_VERSION(2, 14, 0)
         gchar* help = g_option_context_get_help(context, FALSE, NULL);
         fprintf(stderr, "%s", help);
@@ -152,7 +166,7 @@ int main(int argc, char *argv[])
 
     setlocale(LC_COLLATE, "");
     setlocale(LC_CTYPE, "");
-    tree = filetree_init(file_names, g_strv_length(file_names),
+    tree = filetree_init(&argv[1], argc - 1,
                          recursive, follow_symlinks, &errors);
     /* filetree_print(tree); */
 
