@@ -6,7 +6,7 @@
 #include <locale.h>
 
 #include "filetree.h"
-#include "parse_global_args.h"
+#include "parse_args.h"
 
 static gboolean recursive = FALSE;
 static gboolean follow_symlinks = FALSE;
