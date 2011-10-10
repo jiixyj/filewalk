@@ -54,7 +54,8 @@ static int compare_insert_last(gconstpointer lhs,
 }
 
 static struct filename_representations
-*filename_representations_new(const char *raw, int type)
+*filename_representations_new(const char *raw, int type,
+                              size_t display_remove_prefix_len)
 {
     struct filename_representations *fr;
     char *display_pre;
@@ -65,6 +66,20 @@ static struct filename_representations
 
     display_pre = g_filename_display_name(fr->raw);
     fr->collate_key = g_utf8_collate_key_for_filename(display_pre, -1);
+
+    if (type == FILETREE_FILE) {
+        if (display_remove_prefix_len) {
+            char *display_pre_tmp = fr->raw + display_remove_prefix_len;
+            g_free(display_pre);
+            while (*display_pre_tmp == G_DIR_SEPARATOR) ++display_pre_tmp;
+            display_pre = g_filename_display_name(display_pre_tmp);
+        } else {
+            char *display_pre_tmp = g_path_get_basename(fr->raw);
+            g_free(display_pre);
+            display_pre = g_filename_display_name(display_pre_tmp);
+            g_free(display_pre_tmp);
+        }
+    }
 
     fr->display = g_strescape(display_pre,
                               (const gchar *) strescape_exceptions);
@@ -84,7 +99,8 @@ static void walk_recursive(const char *current_dir_string,
                            GDir *current_dir,
                            GTree *current_tree,
                            gboolean follow_symlinks,
-                           GSList **errors)
+                           GSList **errors,
+                           size_t display_remove_prefix_len)
 {
     const gchar *basename;
     gchar *filename;
@@ -107,17 +123,18 @@ static void walk_recursive(const char *current_dir_string,
                 *errors = g_slist_prepend(*errors, err);
                 goto next;
             }
-            fr = filename_representations_new(filename, FILETREE_DIR);
+            fr = filename_representations_new(filename, FILETREE_DIR, 0);
             sub_dir_tree = g_tree_new_full(compare_filenames, NULL,
                                            filename_representations_free,
                                            filetree_destroy);
             g_tree_insert(current_tree, fr, sub_dir_tree);
             walk_recursive(filename, sub_dir, sub_dir_tree,
-                           follow_symlinks, errors);
+                           follow_symlinks, errors, display_remove_prefix_len);
             g_dir_close(sub_dir);
         } else if (g_file_test(filename, G_FILE_TEST_IS_REGULAR)) {
             struct filename_representations *fr;
-            fr = filename_representations_new(filename, FILETREE_FILE);
+            fr = filename_representations_new(filename, FILETREE_FILE,
+                                              display_remove_prefix_len);
             g_tree_insert(current_tree, fr, NULL);
         }
       next:
@@ -164,17 +181,17 @@ Filetree filetree_init(char *roots[],
                 err = NULL;
                 continue;
             }
-            fr = filename_representations_new(roots[i], FILETREE_DIR);
+            fr = filename_representations_new(roots[i], FILETREE_DIR, 0);
             sub_dir_tree = g_tree_new_full(compare_filenames, NULL,
                                            filename_representations_free,
                                            filetree_destroy);
 
             g_tree_insert(root_tree, fr, sub_dir_tree);
             walk_recursive(roots[i], dir, sub_dir_tree,
-                           follow_symlinks, errors);
+                           follow_symlinks, errors, strlen(roots[i]));
             g_dir_close(dir);
         } else if (g_file_test(roots[i], G_FILE_TEST_IS_REGULAR)) {
-            fr = filename_representations_new(roots[i], FILETREE_FILE);
+            fr = filename_representations_new(roots[i], FILETREE_FILE, 0);
             g_tree_insert(root_tree, fr, NULL);
         } else {
             *errors = g_slist_prepend(*errors, g_error_new(1, 1,
