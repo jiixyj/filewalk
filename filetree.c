@@ -2,6 +2,8 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
+#include <stdlib.h>
 #ifdef G_OS_WIN32
 #include <io.h>
 #include <fcntl.h>
@@ -58,17 +60,20 @@ static struct filename_representations
 {
     struct filename_representations *fr;
     char *display_pre;
+    char *real_path;
 
     fr = g_malloc(sizeof(struct filename_representations));
     fr->type = type;
     fr->raw = g_strdup(raw);
 
-    display_pre = g_filename_display_name(fr->raw);
+    real_path = realpath(fr->raw, NULL);
+    display_pre = g_filename_display_name(real_path);
     fr->collate_key = g_utf8_collate_key_for_filename(display_pre, -1);
 
     fr->display = g_strescape(display_pre,
                               (const gchar *) strescape_exceptions);
     g_free(display_pre);
+    g_free(real_path);
     return fr;
 }
 
@@ -309,4 +314,57 @@ void print_utf8_string(const char *string)
 #else
     g_print("%s", string);
 #endif
+}
+
+struct string_plus_length {
+    char *string;
+    size_t length;
+};
+
+static void get_shortest_string(gpointer user, gpointer user_data)
+{
+    struct filename_list_node *fln = (struct filename_list_node *) user;
+    struct string_plus_length *spl = (struct string_plus_length *) user_data;
+    size_t display_string_length = strlen(fln->fr->display);
+
+    if (display_string_length < spl->length) {
+        spl->string = fln->fr->display;
+        spl->length = display_string_length;
+    }
+}
+
+static void find_common_prefix(struct filename_list_node *fln, struct string_plus_length *cp)
+{
+    size_t i = 0;
+    while (i < cp->length &&
+           fln->fr->display[i] &&
+           cp->string[i] &&
+           fln->fr->display[i] == cp->string[i]) { ++i; }
+    cp->length = i;
+}
+
+static void remove_prefix(struct filename_list_node *fln, size_t *len)
+{
+    char *startpos = fln->fr->display + *len;
+    char *new_display;
+
+    while (*startpos == G_DIR_SEPARATOR) ++startpos;
+
+    new_display = g_strdup(startpos);
+    g_free(fln->fr->display);
+    fln->fr->display = new_display;
+}
+
+void filetree_remove_common_prefix(GSList *files) {
+    struct string_plus_length spl = { NULL, -1 }, common_prefix;
+    char *shortest_dir_name;
+
+    if (!files) return;
+    g_slist_foreach(files, get_shortest_string, &spl);
+    common_prefix.string = shortest_dir_name = g_path_get_dirname(spl.string);
+    common_prefix.length = strlen(common_prefix.string);
+    g_slist_foreach(files, find_common_prefix, &common_prefix);
+    g_slist_foreach(files, remove_prefix, &common_prefix.length);
+
+    g_free(shortest_dir_name);
 }

@@ -43,5 +43,6 @@ void filetree_print_file_size(gpointer user, gpointer user_data);
 void filetree_free_list_entry(gpointer user, gpointer user_data);
 
 void print_utf8_string(const char *string);
+void filetree_remove_common_prefix(GSList *files);
 
 #endif /* end of include guard: FILETREE_H */
