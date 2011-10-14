@@ -363,8 +363,8 @@ void filetree_remove_common_prefix(GSList *files) {
     g_slist_foreach(files, get_shortest_string, &spl);
     common_prefix.string = shortest_dir_name = g_path_get_dirname(spl.string);
     common_prefix.length = strlen(common_prefix.string);
-    g_slist_foreach(files, find_common_prefix, &common_prefix);
-    g_slist_foreach(files, remove_prefix, &common_prefix.length);
+    g_slist_foreach(files, (GFunc) find_common_prefix, &common_prefix);
+    g_slist_foreach(files, (GFunc) remove_prefix, &common_prefix.length);
 
     g_free(shortest_dir_name);
 }
