@@ -6,9 +6,6 @@
 #include <stdlib.h>
 #ifdef G_OS_WIN32
 #include <windows.h>
-#include <io.h>
-#define __MSVCRT_VERSION__ 0x0800
-#include <fcntl.h>
 #endif
 #include <sys/stat.h>
 
@@ -317,16 +314,12 @@ void filetree_file_list(Filetree tree, GSList **files)
 void print_utf8_string(const char *string)
 {
 #ifdef G_OS_WIN32
-    int translation_mode;
     gunichar2 *utf16;
 
-    fflush(stdout);
-    translation_mode = _setmode(_fileno(stdout), _O_U8TEXT);
     utf16 = g_utf8_to_utf16(string, -1, NULL, NULL, NULL);
-    wprintf(L"%s", utf16);
+    WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), utf16, wcslen(utf16),
+                  NULL, NULL);
     g_free(utf16);
-    fflush(stdout);
-    _setmode(_fileno(stdout), translation_mode);
 #else
     g_print("%s", string);
 #endif
