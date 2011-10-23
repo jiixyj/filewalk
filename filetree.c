@@ -365,7 +365,7 @@ static void remove_prefix(struct filename_list_node *fln, size_t *len)
 }
 
 void filetree_remove_common_prefix(GSList *files) {
-    struct string_plus_length spl = { NULL, -1 }, common_prefix;
+    struct string_plus_length spl = { NULL, (size_t) -1 }, common_prefix;
     char *shortest_dir_name;
 
     if (!files) return;
