@@ -13,7 +13,7 @@ find_package(GLIB REQUIRED)
 include_directories(SYSTEM ${GLIB_INCLUDE_DIRS})
 
 add_library(filetree filetree.c)
-target_link_libraries(filetree ${GLIB_LIBRARIES})
+target_link_libraries(filetree ${GLIB_LIBRARY})
 
 add_executable(walk main.c)
-target_link_libraries(walk filetree parse_args)
+target_link_libraries(walk filetree parse_args ${GTHREAD_LIBRARY})
