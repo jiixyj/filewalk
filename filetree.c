@@ -357,7 +357,11 @@ static void remove_prefix(struct filename_list_node *fln, size_t *len)
     char *startpos = fln->fr->display + *len;
     char *new_display;
 
-    while (*startpos == G_DIR_SEPARATOR) ++startpos;
+    while (*startpos == G_DIR_SEPARATOR
+#ifdef G_OS_WIN32
+           || *startpos == '/'
+#endif
+        ) ++startpos;
 
     new_display = g_strdup(startpos);
     g_free(fln->fr->display);
