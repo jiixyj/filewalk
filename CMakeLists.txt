@@ -1,16 +1,17 @@
-######################################
-##### CMake environment setup    #####
-######################################
-project(filewalk)
-cmake_minimum_required(VERSION 2.6.4)
-set(CMAKE_MODULE_PATH ${${PROJECT_NAME}_SOURCE_DIR}/cmake)
-set(EXECUTABLE_OUTPUT_PATH ${${PROJECT_NAME}_BINARY_DIR})
-set(LIBRARY_OUTPUT_PATH ${${PROJECT_NAME}_BINARY_DIR})
+project(filewalk C)
+cmake_minimum_required(VERSION 2.8)
 include_directories(${${PROJECT_NAME}_SOURCE_DIR})
 
+find_package(PkgConfig)
+if(PKG_CONFIG_FOUND)
+  pkg_check_modules(GLIB20    glib-2.0)
+endif()
 
-find_package(GLIB REQUIRED)
-include_directories(SYSTEM ${GLIB_INCLUDE_DIRS})
+if(GLIB20_FOUND AND NOT DISABLE_GLIB20)
+  include_directories(SYSTEM ${GLIB20_INCLUDE_DIRS})
+  link_directories(          ${GLIB20_LIBRARY_DIRS})
+  add_definitions(           ${GLIB20_CFLAGS_OTHER})
 
-add_library(filetree filetree.c)
-target_link_libraries(filetree ${GLIB_LIBRARY})
+  add_library(filetree filetree.c)
+  target_link_libraries(filetree ${GLIB20_LIBRARIES})
+endif()
