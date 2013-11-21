@@ -1,3 +1,5 @@
+/* See COPYING file for copyright and license details. */
+
 #ifndef FILETREE_H
 #define FILETREE_H
 
