@@ -316,12 +316,15 @@ void filetree_file_list(Filetree tree, GSList **files)
 void print_utf8_string(const char *string)
 {
 #ifdef G_OS_WIN32
-    gunichar2 *utf16;
-
-    utf16 = g_utf8_to_utf16(string, -1, NULL, NULL, NULL);
-    WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), utf16, wcslen(utf16),
-                  NULL, NULL);
-    g_free(utf16);
+    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (GetFileType(h) != FILE_TYPE_CHAR)
+        fputs(string, stdout);
+    else {
+        gunichar2 *utf16 = g_utf8_to_utf16(string, -1, NULL, NULL, NULL);
+        fflush(stdout);
+        WriteConsoleW(h, utf16, wcslen(utf16), NULL, NULL);
+        g_free(utf16);
+    }
 #else
     g_print("%s", string);
 #endif
