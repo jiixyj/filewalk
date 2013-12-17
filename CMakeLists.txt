@@ -14,4 +14,6 @@ if(GLIB20_FOUND AND NOT DISABLE_GLIB20)
 
   add_library(filetree filetree.c)
   target_link_libraries(filetree ${GLIB20_LIBRARIES})
+
+  install(TARGETS filetree DESTINATION lib)
 endif()
